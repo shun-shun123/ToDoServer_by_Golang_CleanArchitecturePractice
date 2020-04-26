@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"fmt"
 	"github.com/shun-shun123/clean_architecture_todo/src/app/domain"
 	"github.com/shun-shun123/clean_architecture_todo/src/app/interfaces/database"
 	"github.com/shun-shun123/clean_architecture_todo/src/app/usecase"
@@ -47,6 +48,7 @@ func (controller *ToDoController) Update(c Context) {
 	c.Bind(&todo)
 	data, err := controller.Interactor.Update(todo)
 	if err != nil {
+		fmt.Println(err)
 		c.JSON(501, err)
 		return
 	}
@@ -56,7 +58,7 @@ func (controller *ToDoController) Update(c Context) {
 func (controller *ToDoController) Delete(c Context) {
 	todo := domain.ToDo{}
 	c.Bind(&todo)
-	data, err := controller.Interactor.Update(todo)
+	data, err := controller.Interactor.Delete(todo)
 	if err != nil {
 		c.JSON(501, err)
 		return

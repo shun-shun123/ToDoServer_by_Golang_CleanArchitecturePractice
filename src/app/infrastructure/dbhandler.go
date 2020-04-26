@@ -4,14 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/shun-shun123/clean_architecture_todo/src/app/domain"
-	"io"
 	"io/ioutil"
 	"os"
 )
 
 type DBHandler struct {
-	io.Writer
-	io.Reader
+	file *os.File
 }
 
 func NewDBHandler() *DBHandler {
@@ -20,13 +18,14 @@ func NewDBHandler() *DBHandler {
 	if err != nil {
 		return nil
 	}
-	dbHandler.Writer = file
-	dbHandler.Reader = file
+	dbHandler.file = file
 	return dbHandler
 }
 
-func (handler *DBHandler) readDBContent() domain.ToDos {
-	buffer, err := ioutil.ReadAll(handler.Reader)
+func readDBContent() domain.ToDos {
+	file, _ := os.Open("db.json")
+	defer file.Close()
+	buffer, err := ioutil.ReadAll(file)
 	if err != nil {
 		return domain.ToDos{}
 	}
@@ -39,10 +38,12 @@ func (handler *DBHandler) readDBContent() domain.ToDos {
 }
 
 func (handler *DBHandler) Create(todo domain.ToDo) (domain.ToDo, error) {
-	todos := handler.readDBContent()
+	todos := readDBContent()
+	handler.file, _ = os.Create("db.json")
+	defer handler.file.Close()
 	todos.Todos = append(todos.Todos, todo)
 	writeData, err := json.Marshal(todos)
-	_, err = handler.Writer.Write(writeData)
+	_, err = handler.file.Write(writeData)
 	if err != nil {
 		return todo, err
 	}
@@ -51,45 +52,60 @@ func (handler *DBHandler) Create(todo domain.ToDo) (domain.ToDo, error) {
 
 func (handler *DBHandler) Read(todo domain.ToDo) (domain.ToDo, error) {
 	// DBから全部読み出す
-	todos := handler.readDBContent()
+	todos := readDBContent()
+	handler.file, _ = os.Create("db.json")
+	defer handler.file.Close()
+	err := fmt.Errorf("ID %v is not found", todo.ID)
 	for _, v := range todos.Todos {
 		if v.ID == todo.ID {
-			return v, nil
+			todo = v
+			err = nil
+			break
 		}
 	}
-	err := fmt.Errorf("ID %v is not found", todo.ID)
+	data, _ := json.Marshal(todos)
+	handler.file.Write(data)
 	return todo, err
 }
 
 func (handler *DBHandler) Update(todo domain.ToDo) (domain.ToDo, error) {
-	todos := handler.readDBContent()
+	todos := readDBContent()
+	handler.file, _ = os.Create("db.json")
+	defer handler.file.Close()
 	err := fmt.Errorf("ID %v is not found", todo.ID)
 	for i, v := range todos.Todos {
+		fmt.Printf("ID: %v\n", v.ID)
 		if v.ID == todo.ID {
 			todos.Todos[i] = todo
 			err = nil
 			break
 		}
 	}
+	data, _ := json.Marshal(todos)
+	handler.file.Write(data)
 	return todo, err
 }
 
 func (handler *DBHandler) Delete(todo domain.ToDo) (domain.ToDo, error) {
-	todos := handler.readDBContent()
+	todos := readDBContent()
+	handler.file, _ = os.Create("db.json")
+	defer handler.file.Close()
 	err := fmt.Errorf("ID %v is not found", todo.ID)
 	for i, v := range todos.Todos {
 		if v.ID == todo.ID {
+			fmt.Printf("ID: %v is found", todo.ID)
 			todos.Todos = append(todos.Todos[:i], todos.Todos[i+1:]...)
+			err = nil
 			break
 		}
 	}
-	data, err := json.Marshal(todos)
-	if err != nil {
-		return todo, err
+	data, marshalErr := json.Marshal(todos)
+	if marshalErr != nil {
+		return todo, marshalErr
 	}
-	_, err = handler.Writer.Write(data)
-	if err != nil {
-		return todo, err
+	_, writeErr := handler.file.Write(data)
+	if writeErr != nil {
+		return todo, writeErr
 	}
 	return todo, err
 }
